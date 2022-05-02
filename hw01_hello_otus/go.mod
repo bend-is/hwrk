@@ -1,4 +1,4 @@
-module github.com/bend-is/hw01_hello_otus
+module github.com/bend-is/hwrk/hw01_hello_otus
 
 go 1.16
 
