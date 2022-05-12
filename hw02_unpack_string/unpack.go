@@ -36,7 +36,7 @@ func Unpack(s string) (string, error) {
 				continue
 			}
 			b.WriteRune(sRunes[i+1])
-			i += 1
+			i++
 
 			continue
 		}
