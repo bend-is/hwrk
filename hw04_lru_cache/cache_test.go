@@ -50,13 +50,77 @@ func TestCache(t *testing.T) {
 	})
 
 	t.Run("purge logic", func(t *testing.T) {
-		// Write me
+		c := NewCache(5)
+
+		values := []struct {
+			key   Key
+			value string
+		}{
+			{key: "aaa", value: "test_value_1"},
+			{key: "bbb", value: "test_value_2"},
+			{key: "ccc", value: "test_value_3"},
+		}
+
+		for _, v := range values {
+			c.Set(v.key, v.value)
+
+			val, exist := c.Get(v.key)
+			require.True(t, exist)
+			require.Equal(t, v.value, val)
+		}
+
+		c.Clear()
+
+		for _, v := range values {
+			val, exist := c.Get(v.key)
+			require.False(t, exist)
+			require.Nil(t, val)
+		}
+	})
+
+	t.Run("full cache", func(t *testing.T) {
+		c := NewCache(2)
+
+		c.Set("1", 1)
+		c.Set("2", 2)
+		c.Set("3", 3)
+
+		val, exist := c.Get("3")
+		require.True(t, exist)
+		require.Equal(t, 3, val)
+
+		val, exist = c.Get("2")
+		require.True(t, exist)
+		require.Equal(t, 2, val)
+
+		val, exist = c.Get("1")
+		require.False(t, exist)
+		require.Nil(t, val)
+	})
+
+	t.Run("full cache removes less used element", func(t *testing.T) {
+		c := NewCache(3)
+
+		c.Set("1", 1)
+		c.Set("2", 2)
+		c.Set("3", 3)
+
+		c.Get("1")
+		c.Get("2")
+		c.Get("3")
+
+		c.Get("1")
+		c.Get("3")
+
+		c.Set("4", 44)
+
+		val, exist := c.Get("2")
+		require.False(t, exist)
+		require.Nil(t, val)
 	})
 }
 
 func TestCacheMultithreading(t *testing.T) {
-	t.Skip() // Remove me if task with asterisk completed.
-
 	c := NewCache(10)
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
