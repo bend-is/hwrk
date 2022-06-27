@@ -9,11 +9,15 @@ type (
 type Stage func(in In) (out Out)
 
 func ExecutePipeline(in In, done In, stages ...Stage) Out {
-	out := make(Bi)
-
 	for _, stage := range stages {
-		in = stage(in)
+		in = stage(wrapWithCancel(in, done))
 	}
+
+	return in
+}
+
+func wrapWithCancel(in In, done In) Out {
+	out := make(Bi)
 
 	go func() {
 		defer close(out)
