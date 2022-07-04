@@ -9,6 +9,10 @@ type (
 type Stage func(in In) (out Out)
 
 func ExecutePipeline(in In, done In, stages ...Stage) Out {
+	if len(stages) == 0 {
+		return wrapWithCancel(in, done)
+	}
+
 	for _, stage := range stages {
 		in = stage(wrapWithCancel(in, done))
 	}
