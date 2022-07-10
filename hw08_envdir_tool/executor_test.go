@@ -10,7 +10,7 @@ import (
 
 func TestRunCmd(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		output := captureStdout(func() {
+		output, err := captureStdout(func() {
 			cmd := []string{"/bin/bash", "testdata/echo.sh", "arg1"}
 			env := Environment{"FOO": EnvValue{Value: "TEST"}}
 
@@ -18,6 +18,8 @@ func TestRunCmd(t *testing.T) {
 
 			require.Equal(t, 0, code)
 		})
+
+		require.NoError(t, err)
 
 		want := `HELLO is ()
 BAR is ()
@@ -43,38 +45,40 @@ arguments are arg1
 		}
 		defer os.Remove(scriptName)
 
-		output := captureStderr(func() {
+		output, err := captureStderr(func() {
 			code := RunCmd([]string{scriptName}, nil)
 
 			require.Equal(t, 5, code)
 		})
 
+		require.NoError(t, err)
 		require.Equal(t, "test error\n", output)
 	})
 
 	t.Run("empty command list", func(t *testing.T) {
-		output := captureStderr(func() {
+		output, err := captureStderr(func() {
 			code := RunCmd(nil, nil)
 
 			require.Equal(t, 1, code)
 		})
 
+		require.NoError(t, err)
 		require.Equal(t, "Empty command list\n", output)
 	})
 }
 
-func captureStdout(f func()) string {
+func captureStdout(f func()) (string, error) {
 	return captureStdoutOrStderr(f, true)
 }
 
-func captureStderr(f func()) string {
+func captureStderr(f func()) (string, error) {
 	return captureStdoutOrStderr(f, false)
 }
 
-func captureStdoutOrStderr(f func(), needStdout bool) string {
+func captureStdoutOrStderr(f func(), needStdout bool) (string, error) {
 	r, w, err := os.Pipe()
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 	defer r.Close()
 
@@ -97,13 +101,13 @@ func captureStdoutOrStderr(f func(), needStdout bool) string {
 	f()
 
 	if err := w.Close(); err != nil {
-		panic(err)
+		return "", err
 	}
 
 	b, err := io.ReadAll(r)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
-	return string(b)
+	return string(b), nil
 }
