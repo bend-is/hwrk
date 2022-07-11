@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type UserRole string
@@ -42,7 +44,16 @@ func TestValidate(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			// Place your code here.
+			in: User{
+				ID:     "testID123456789101112131415161789012",
+				Name:   "name for test",
+				Age:    45,
+				Email:  "test@mail.test",
+				Role:   "admin",
+				Phones: []string{"89611111118", "89614111741"},
+				meta:   nil,
+			},
+			expectedErr: nil,
 		},
 		// ...
 		// Place your code here.
@@ -53,8 +64,9 @@ func TestValidate(t *testing.T) {
 			tt := tt
 			t.Parallel()
 
-			// Place your code here.
-			_ = tt
+			err := Validate(tt.in)
+
+			require.Equal(t, tt.expectedErr, err)
 		})
 	}
 }
