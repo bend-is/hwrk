@@ -38,13 +38,20 @@ type (
 		Body string `json:"omitempty"`
 	}
 
-	InvalidValidationRules struct {
-		ID     string   `validate:"len:short"`
-		AgeMin int      `validate:"min:youngster"`
-		AgeMax int      `validate:"max:adult"`
-		Code   int      `validate:"in:one,two"`
-		Phones []string `validate:"len:normal"`
-		Email  string   `validate:"regexp:(@"`
+	InvalidValidationRuleLen struct {
+		ID string `validate:"len:short"`
+	}
+	InvalidValidationRuleMin struct {
+		Age int `validate:"min:youngster"`
+	}
+	InvalidValidationRuleMax struct {
+		Age int `validate:"max:adult"`
+	}
+	InvalidValidationRuleInInteger struct {
+		Code int `validate:"in:one,two"`
+	}
+	InvalidValidationRuleRegExp struct {
+		Email string `validate:"regexp:(@"`
 	}
 )
 
@@ -142,22 +149,24 @@ func TestValidate(t *testing.T) {
 			},
 		},
 		{
-			in: InvalidValidationRules{
-				ID:     "testID123456789101112131415161789012",
-				AgeMin: 12,
-				AgeMax: 50,
-				Code:   200,
-				Phones: []string{"89611111118", "89614111741"},
-				Email:  "test@mail.test",
-			},
-			expectedErr: ValidationErrors{
-				{Field: "ID", Err: ErrInvalidRule},
-				{Field: "AgeMin", Err: ErrInvalidRule},
-				{Field: "AgeMax", Err: ErrInvalidRule},
-				{Field: "Code", Err: ErrInvalidRule},
-				{Field: "Phones", Err: ErrInvalidRule},
-				{Field: "Email", Err: ErrInvalidRule},
-			},
+			in:          InvalidValidationRuleLen{ID: "ID123456"},
+			expectedErr: ErrInvalidRule,
+		},
+		{
+			in:          InvalidValidationRuleMin{Age: 12},
+			expectedErr: ErrInvalidRule,
+		},
+		{
+			in:          InvalidValidationRuleMax{Age: 50},
+			expectedErr: ErrInvalidRule,
+		},
+		{
+			in:          InvalidValidationRuleInInteger{Code: 200},
+			expectedErr: ErrInvalidRule,
+		},
+		{
+			in:          InvalidValidationRuleRegExp{Email: "test@mail.test"},
+			expectedErr: ErrInvalidRule,
 		},
 	}
 

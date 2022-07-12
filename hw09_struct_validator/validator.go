@@ -66,8 +66,7 @@ func Validate(v interface{}) error { //nolint:gocognit
 		case reflect.Int:
 			validator, err := parseIntFieldValidationRules(tag)
 			if err != nil {
-				validationErrs = append(validationErrs, ValidationError{Field: fieldType.Name, Err: err})
-				continue
+				return err
 			}
 
 			if err := validator.validate(fieldValue.Int()); err != nil {
@@ -76,8 +75,7 @@ func Validate(v interface{}) error { //nolint:gocognit
 		case reflect.String:
 			validator, err := parseStringFieldValidationRules(tag)
 			if err != nil {
-				validationErrs = append(validationErrs, ValidationError{Field: fieldType.Name, Err: err})
-				continue
+				return err
 			}
 
 			if err := validator.validate(fieldValue.String()); err != nil {
@@ -88,8 +86,7 @@ func Validate(v interface{}) error { //nolint:gocognit
 			case []int:
 				validator, err := parseIntFieldValidationRules(tag)
 				if err != nil {
-					validationErrs = append(validationErrs, ValidationError{Field: fieldType.Name, Err: err})
-					continue
+					return err
 				}
 
 				if err := validator.validateSlice(fieldType.Name, val); err != nil {
@@ -98,8 +95,7 @@ func Validate(v interface{}) error { //nolint:gocognit
 			case []string:
 				validator, err := parseStringFieldValidationRules(tag)
 				if err != nil {
-					validationErrs = append(validationErrs, ValidationError{Field: fieldType.Name, Err: err})
-					continue
+					return err
 				}
 
 				if err := validator.validateSlice(fieldType.Name, val); err != nil {
