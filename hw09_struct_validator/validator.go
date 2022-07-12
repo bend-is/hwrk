@@ -12,6 +12,7 @@ import (
 
 var (
 	ErrUnsupportedType = errors.New("unsupported type")
+	ErrInvalidRule     = errors.New("invalid validation rule")
 
 	ErrNotInList      = errors.New("value must exist in list")
 	ErrExactLen       = errors.New("value must be exact length")
@@ -41,7 +42,7 @@ func (v ValidationErrors) Error() string {
 }
 
 func Validate(v interface{}) error { //nolint:gocognit
-	var validationErr ValidationErrors
+	var validationErrs ValidationErrors
 
 	refValue := reflect.ValueOf(v)
 	if refValue.Kind() != reflect.Struct {
@@ -50,56 +51,66 @@ func Validate(v interface{}) error { //nolint:gocognit
 
 	filedCount := refValue.NumField()
 	for i := 0; i < filedCount; i++ {
+		fieldValue := refValue.Field(i)
+		if !fieldValue.CanInterface() {
+			continue
+		}
+
 		fieldType := refValue.Type().Field(i)
 		tag := fieldType.Tag.Get("validate")
 		if tag == "" {
 			continue
 		}
 
-		fieldValue := refValue.Field(i)
 		switch fieldValue.Kind() { //nolint:exhaustive
 		case reflect.Int:
-			if err := parseIntFieldValidationRules(tag).validate(fieldValue.Int()); err != nil {
-				validationErr = append(validationErr, ValidationError{Field: fieldType.Name, Err: err})
-			}
-		case reflect.String:
-			if err := parseStringFieldValidationRules(tag).validate(fieldValue.String()); err != nil {
-				validationErr = append(validationErr, ValidationError{Field: fieldType.Name, Err: err})
-			}
-		case reflect.Slice:
-			if fieldValue.Len() == 0 {
+			validator, err := parseIntFieldValidationRules(tag)
+			if err != nil {
+				validationErrs = append(validationErrs, ValidationError{Field: fieldType.Name, Err: err})
 				continue
 			}
 
-			switch fieldValue.Index(0).Kind() { //nolint:exhaustive
-			case reflect.Int:
-				validator := parseIntFieldValidationRules(tag)
+			if err := validator.validate(fieldValue.Int()); err != nil {
+				validationErrs = append(validationErrs, ValidationError{Field: fieldType.Name, Err: err})
+			}
+		case reflect.String:
+			validator, err := parseStringFieldValidationRules(tag)
+			if err != nil {
+				validationErrs = append(validationErrs, ValidationError{Field: fieldType.Name, Err: err})
+				continue
+			}
 
-				for j := 0; j < fieldValue.Len(); j++ {
-					if err := validator.validate(fieldValue.Index(j).Int()); err != nil {
-						validationErr = append(validationErr, ValidationError{
-							Err:   err,
-							Field: fmt.Sprintf("%s.%d", fieldType.Name, j),
-						})
-					}
+			if err := validator.validate(fieldValue.String()); err != nil {
+				validationErrs = append(validationErrs, ValidationError{Field: fieldType.Name, Err: err})
+			}
+		case reflect.Slice:
+			switch val := fieldValue.Interface().(type) {
+			case []int:
+				validator, err := parseIntFieldValidationRules(tag)
+				if err != nil {
+					validationErrs = append(validationErrs, ValidationError{Field: fieldType.Name, Err: err})
+					continue
 				}
-			case reflect.String:
-				validator := parseStringFieldValidationRules(tag)
 
-				for j := 0; j < fieldValue.Len(); j++ {
-					if err := validator.validate(fieldValue.Index(j).String()); err != nil {
-						validationErr = append(validationErr, ValidationError{
-							Err:   err,
-							Field: fmt.Sprintf("%s.%d", fieldType.Name, j),
-						})
-					}
+				if err := validator.validateSlice(fieldType.Name, val); err != nil {
+					validationErrs = append(validationErrs, err...)
+				}
+			case []string:
+				validator, err := parseStringFieldValidationRules(tag)
+				if err != nil {
+					validationErrs = append(validationErrs, ValidationError{Field: fieldType.Name, Err: err})
+					continue
+				}
+
+				if err := validator.validateSlice(fieldType.Name, val); err != nil {
+					validationErrs = append(validationErrs, err...)
 				}
 			}
 		}
 	}
 
-	if len(validationErr) != 0 {
-		return validationErr
+	if len(validationErrs) != 0 {
+		return validationErrs
 	}
 
 	return nil
@@ -144,6 +155,25 @@ func (v intFieldValidator) validate(item int64) error {
 	return nil
 }
 
+func (v intFieldValidator) validateSlice(fieldName string, items []int) ValidationErrors {
+	if len(items) == 0 {
+		return nil
+	}
+
+	var errs ValidationErrors
+
+	for i := range items {
+		if err := v.validate(int64(items[i])); err != nil {
+			errs = append(errs, ValidationError{
+				Err:   err,
+				Field: fmt.Sprintf("%s.%d", fieldName, i),
+			})
+		}
+	}
+
+	return errs
+}
+
 func (v stringFieldValidator) validate(item string) error {
 	if v.len != 0 && utf8.RuneCountInString(item) != v.len {
 		return fmt.Errorf("%w %d", ErrExactLen, v.len)
@@ -170,7 +200,26 @@ func (v stringFieldValidator) validate(item string) error {
 	return nil
 }
 
-func parseIntFieldValidationRules(tag string) intFieldValidator {
+func (v stringFieldValidator) validateSlice(fieldName string, items []string) ValidationErrors {
+	if len(items) == 0 {
+		return nil
+	}
+
+	var errs ValidationErrors
+
+	for i := range items {
+		if err := v.validate(items[i]); err != nil {
+			errs = append(errs, ValidationError{
+				Err:   err,
+				Field: fmt.Sprintf("%s.%d", fieldName, i),
+			})
+		}
+	}
+
+	return errs
+}
+
+func parseIntFieldValidationRules(tag string) (intFieldValidator, error) {
 	var validator intFieldValidator
 
 	rules := strings.Split(tag, "|")
@@ -183,25 +232,37 @@ func parseIntFieldValidationRules(tag string) intFieldValidator {
 
 		switch parts[0] {
 		case "min":
-			validator.min, _ = strconv.ParseInt(parts[1], 10, 64)
+			v, err := strconv.ParseInt(parts[1], 10, 64)
+			if err != nil {
+				return validator, fmt.Errorf("%w: min must be a valid integer", ErrInvalidRule)
+			}
+
+			validator.min = v
 		case "max":
-			validator.max, _ = strconv.ParseInt(parts[1], 10, 64)
+			v, err := strconv.ParseInt(parts[1], 10, 64)
+			if err != nil {
+				return validator, fmt.Errorf("%w: max must be a valid integer", ErrInvalidRule)
+			}
+
+			validator.max = v
 		case "in":
 			numbers := strings.Split(parts[1], ",")
 			validator.in = make([]int64, 0, len(numbers))
 
 			for _, n := range numbers {
-				if v, err := strconv.ParseInt(n, 10, 64); err == nil {
-					validator.in = append(validator.in, v)
+				v, err := strconv.ParseInt(n, 10, 64)
+				if err != nil {
+					return validator, fmt.Errorf("%w: in must contain valid intergers", ErrInvalidRule)
 				}
+				validator.in = append(validator.in, v)
 			}
 		}
 	}
 
-	return validator
+	return validator, nil
 }
 
-func parseStringFieldValidationRules(tag string) stringFieldValidator {
+func parseStringFieldValidationRules(tag string) (stringFieldValidator, error) {
 	var validator stringFieldValidator
 
 	rules := strings.Split(tag, "|")
@@ -214,13 +275,23 @@ func parseStringFieldValidationRules(tag string) stringFieldValidator {
 
 		switch parts[0] {
 		case "len":
-			validator.len, _ = strconv.Atoi(parts[1])
+			v, err := strconv.Atoi(parts[1])
+			if err != nil {
+				return validator, fmt.Errorf("%w: len must be a valid integer", ErrInvalidRule)
+			}
+
+			validator.len = v
 		case "regexp":
-			validator.re, _ = regexp.Compile(parts[1])
+			re, err := regexp.Compile(parts[1])
+			if err != nil {
+				return validator, fmt.Errorf("%w: regexp must contain valid regular expression", ErrInvalidRule)
+			}
+
+			validator.re = re
 		case "in":
 			validator.in = strings.Split(parts[1], ",")
 		}
 	}
 
-	return validator
+	return validator, nil
 }
