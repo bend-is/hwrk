@@ -48,7 +48,7 @@ func main() {
 		exitWithError("close connection failed: "+err.Error(), false)
 	}
 
-	fmt.Println("Exit")
+	fmt.Fprint(os.Stderr, "Exit")
 }
 
 func exitWithError(msg string, printUsage bool) {
