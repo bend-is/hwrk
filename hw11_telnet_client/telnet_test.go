@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -61,5 +62,14 @@ func TestTelnetClient(t *testing.T) {
 		}()
 
 		wg.Wait()
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		cl := NewTelnetClient("8.8.8.8:80", time.Millisecond, os.Stdin, os.Stdout)
+
+		err := cl.Connect()
+
+		require.Error(t, err)
+		require.Equal(t, "dial tcp 8.8.8.8:80: i/o timeout", err.Error())
 	})
 }
