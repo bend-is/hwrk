@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 )
@@ -23,7 +23,10 @@ func main() {
 		exitWithError("not enough arguments", true)
 	}
 
-	telnetCl := NewTelnetClient(strings.Join(flag.Args()[:2], ":"), timeout, os.Stdin, os.Stdout)
+	host := flag.Args()[0]
+	port := flag.Args()[1]
+
+	telnetCl := NewTelnetClient(net.JoinHostPort(host, port), timeout, os.Stdin, os.Stdout)
 
 	if err := telnetCl.Connect(); err != nil {
 		exitWithError("connection failed: "+err.Error(), false)

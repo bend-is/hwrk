@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"io"
 	"net"
@@ -59,15 +58,11 @@ func (c *client) Send() error {
 		return ErrNotConnected
 	}
 
-	scanner := bufio.NewScanner(c.in)
-	for scanner.Scan() {
-		b := append(scanner.Bytes(), '\n')
-		if _, err := c.conn.Write(b); err != nil {
-			return err
-		}
+	if _, err := io.Copy(c.conn, c.in); err != nil {
+		return err
 	}
 
-	return scanner.Err()
+	return nil
 }
 
 func (c *client) Receive() error {
@@ -75,15 +70,7 @@ func (c *client) Receive() error {
 		return ErrNotConnected
 	}
 
-	scanner := bufio.NewScanner(c.conn)
-	for scanner.Scan() {
-		b := append(scanner.Bytes(), '\n')
-		if _, err := c.out.Write(b); err != nil {
-			return err
-		}
-	}
-
-	if err := scanner.Err(); err != nil && !errors.Is(err, net.ErrClosed) {
+	if _, err := io.Copy(c.out, c.conn); err != nil && !errors.Is(err, net.ErrClosed) {
 		return err
 	}
 
