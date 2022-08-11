@@ -8,7 +8,7 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-var ErrUnsortedFormat = errors.New("unsupported config file format")
+var ErrUnsupportedFormat = errors.New("unsupported config file format")
 
 type Config struct {
 	Logger LoggerConf `toml:"Logger"`
@@ -30,6 +30,6 @@ func ParseConfigFile(filePath string) (Config, error) {
 
 		return c, nil
 	default:
-		return Config{}, ErrUnsortedFormat
+		return Config{}, ErrUnsupportedFormat
 	}
 }
