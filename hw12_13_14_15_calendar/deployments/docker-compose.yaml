@@ -1,1 +1,32 @@
 version: "3"
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  pg-data:
+
+services:
+  postgres:
+    image: postgres:14.4-alpine # https://hub.docker.com/_/postgres
+    restart: on-failure
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: forge
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pg-data:/var/lib/postgresql/data:cached
+    ports:
+      - '49999:5432'
+    networks:
+      - app-network
+
+  migrator:
+    image: migrate/migrate:v4.15.2 # https://hub.docker.com/r/migrate/migrate
+    volumes:
+      - ../migrations:/migrations
+    depends_on:
+      - postgres
+    networks:
+      - app-network
